@@ -16,7 +16,7 @@ return [
     |
     */
 
-    'default' => 'live',
+    'default' => 'local_dev',
 
     /*
     |--------------------------------------------------------------------------
@@ -49,7 +49,7 @@ return [
             'url' => '',
             'host' => '127.0.0.1',
             'port' => '3306',
-            'database' => 'audifiar',
+            'database' => 'audifair',
             'username' => 'root',
             'password' => '',
             'unix_socket' =>'',

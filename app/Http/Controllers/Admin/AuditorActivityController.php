@@ -178,7 +178,7 @@ class AuditorActivityController extends Controller
     }
 
     public function openForm() {
-        $audit  = Audit::where('id', encrypt_decrypt(request()->audit_no, 'decrypt'))->firstOrFail();
+        //$audit  = Audit::where('id', encrypt_decrypt(request()->audit_no, 'decrypt'))->firstOrFail();
         $form =  DynamicForm::with('audit_step', 'question')->findOrFail(encrypt_decrypt(request()->form_no, 'decrypt'));
         $form_data = json_decode($form->form_data);
         return view('admin.audits.auditor_dynamic_form', compact('form', 'form_data'));
@@ -245,6 +245,7 @@ class AuditorActivityController extends Controller
             }
         }
 
+        $audit = Audit::whereAuditNumber($request->audit_no)->firstOrFail();
         // Save response
         FormResponse::updateOrInsert(
             [
@@ -254,7 +255,7 @@ class AuditorActivityController extends Controller
             ],
             [
                 'form_id' => $form->id,
-                'audit_id' => encrypt_decrypt($request->audit_no, 'decrypt'),
+                'audit_id' => $audit->id,
                 'audit_step_id' => $form->audit_step_id,
                 'question_id' => $form->question_id,
                 'response_json' => json_encode($validated),
@@ -264,6 +265,6 @@ class AuditorActivityController extends Controller
             ]
         );
 
-        return redirect()->route('admin.auditor-audit-steps', $request->audit_no)->with(infoMessage());
+        return redirect()->route('admin.auditor-audit-steps', encrypt_decrypt($audit->id, 'encrypt'))->with(infoMessage());
     }
 }

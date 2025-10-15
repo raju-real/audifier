@@ -158,8 +158,7 @@
                                                         'form_no=' .
                                                             encrypt_decrypt(getFormId($step_info->audit_step_info->id, $step_question->question->id), 'encrypt') .
                                                             '&audit_no=' .
-                                                            encrypt_decrypt($step_info->audit_id, 'encrypt'),
-                                                        'audit_id=' . encrypt_decrypt($step_info->audit_id, 'encrypt'),
+                                                            $step_info->audit_info->audit_number,
                                                     ) }}"
                                                         target="_blank" class="btn btn-sm btn-primary input-padding"
                                                         {!! tooltip('Open Form') !!}>
