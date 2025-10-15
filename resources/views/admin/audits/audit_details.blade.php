@@ -1,0 +1,191 @@
+@extends('admin.layouts.app')
+@section('title', 'Audit Details')
+
+@section('content')
+
+<section class="search-top-pannel">
+   
+            <div class="page-title-box d-sm-flex align-items-center justify-content-between w-100 p24-14 pb-2">
+                <h4 class="mb-sm-0 font-size-28">Audit Details</h4>
+                <div class="page-title-right">
+                    <a href="{{ route('admin.audits.index') }}" class="bg-orange btn-hover back-all text-white rounded-pill">
+                        <i class="fa fa-arrow-circle-left"></i> Back
+                    </a>
+                </div>
+            </div>
+      
+</section>
+
+
+    <!--<div class="row">-->
+    <!--    <div class="col-12">-->
+    <!--        <div class="page-title-box d-sm-flex align-items-center justify-content-between">-->
+    <!--            <h4 class="mb-sm-0 font-size-18">Audit Details</h4>-->
+    <!--            <div class="page-title-right">-->
+    <!--                <a href="{{ route('admin.audits.index') }}" class="btn btn-sm btn-outline-primary">-->
+    <!--                    <i class="fa fa-arrow-circle-left"></i> Back-->
+    <!--                </a>-->
+    <!--            </div>-->
+    <!--        </div>-->
+    <!--    </div>-->
+    <!--</div>-->
+
+      <div class="row all-field-pannel">
+        <div class="col-12">
+              <div class="card box-shadow-none">
+                <div class="card-body p-0 border">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-striped">
+                                <tr>
+                                    <th class="bg-white">Balance Sheet</th>
+                                    <td>:</td>
+                                    <td><a target="_blank" data-bs-toggle="tooltip" data-bs-placement="top"
+                                                title="Balance Sheet"
+                                                href="{{ route('admin.audit-wise-balance-sheet', encrypt_decrypt($audit->id, 'encrypt')) }}"
+                                                class="btn btn-sm btn-success"><i class="fa fa-credit-card"></i></a></td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-white">Audit No.</th>
+                                    <td>:</td>
+                                    <td>{{ $audit->audit_number ?? '' }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-white">Organization</th>
+                                    <td>:</td>
+                                    <td>{{ $audit->organization->name ?? '' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-striped">
+                                <tr>
+                                    <th class="bg-white">Title</th>
+                                    <td>:</td>
+                                    <td>{{ $audit->title ?? '' }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-white">Financial Year</th>
+                                    <td>:</td>
+                                    <td>{{ $audit->financial_year->financial_year ?? '' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-12">
+                            <table class="table table-striped">
+                                <tr>
+                                    <th class="bg-white">Auditors</th>
+                                    <td>:</td>
+                                    <td>{{ auditWiseAuditors($audit->id) }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-white">Supervisors</th>
+                                    <td>:</td>
+                                    <td>{{ auditWiseSupervisors($audit->id) }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            @foreach ($audit->audit_steps as $audit_step)
+                <div class="card bg-none box-shadow-none">
+                    <div class="card-body">
+                        <div class="card-header bg-secondary text-white">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>Step {{ $audit_step->step_no }} :
+                                    {{ $audit_step->audit_step_info->title ?? '' }}</span>
+                                <span><b>{{ ucFirst($audit_step->status) ?? '' }}</b></span>
+                            </div>
+                        </div>
+
+                        @if ($audit_step->status === 'returned' || $audit_step->status === 'rejected')
+                            <table class="table">
+                                <tr>
+                                    <th class="width-10">
+                                        {{ $audit_step->status === 'returned' ? 'Returned For' : 'Rejected For' }}</th>
+                                    <td>:</td>
+                                    <td>
+                                        @if ($audit_step->status === 'returned')
+                                            {{ $audit_step->returned_for ?? 'N/A' }}
+                                        @elseif($audit_step->status === 'rejected')
+                                            {{ $audit_step->rejected_for ?? 'N/A' }}
+                                        @else
+                                            {{ 'N/A' }}
+                                        @endif
+                                    </td>
+                                </tr>
+                            </table>
+                        @endif
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped table-responsive-md w-100 bg-white">
+                                <colgroup>
+                                    <col class="width-5">
+                                    <col class="width-30">
+                                    <col class="width-20">
+                                    <col class="width-30">
+                                    <col class="width-10">
+                                </colgroup>
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-center">Sl.no</th>
+                                        <th>Question/Particulars</th>
+                                        <th>Yes-No</th>
+                                        <th>Text Answer</th>
+                                        <th class="text-center">Attachment</th>
+                                        <th class="text-center">Form</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($audit_step->audit_step_questions as $index => $step_question)
+                                        <tr>
+                                            <td class="text-center">{{ $step_question->sorting_serial ?? '' }}</td>
+                                            <td>{{ $step_question->question->question ?? 'Question ?' }}</td>
+                                            <td>{{ strtoupper($step_question->closed_ended_answer) }}</td>
+                                            <td>{{ $step_question->text_answer ?? 'N/A' }}</td>
+                                            <td class="text-center">
+                                                @if ($step_question->documents && file_exists($step_question->documents))
+                                                    <a target="_blank" href="{{ asset($step_question->documents) }}"
+                                                        class="btn btn-info btn-sm">
+                                                        <i class="fa fa-file"></i>
+                                                    </a>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if (questionHasForm($audit_step->audit_step_info->id, $step_question->question->id))
+                                                    @if(auditFormAnswer($audit->id,$audit_step->audit_step_info->id, $step_question->question->id))
+                                                    <a href="{{ route('admin.show-audit-form', encrypt_decrypt(responseId($audit->id,$audit_step->audit_step_info->id, $step_question->question->id), 'encrypt')) }}"
+                                                        target="_blank" class="btn btn-sm btn-primary input-padding"
+                                                        {!! tooltip('Open Form') !!}>
+                                                        <i class="fa fa-external-link-alt"></i>
+                                                    </a>
+                                                    @else
+                                                    <span class="text-danger">Not Filled</span>     
+                                                    @endif
+                                                @else
+                                                    N/A
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <x-no-data-found></x-no-data-found>
+                                    @endforelse
+
+                                </tbody>
+                            </table>
+
+                        </div>
+
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    </div>
+@endsection

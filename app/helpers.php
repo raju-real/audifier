@@ -1,0 +1,801 @@
+<?php
+
+use Dom\Comment;
+use Carbon\Carbon;
+use App\Models\User;
+use App\Models\Audit;
+use Illuminate\Support\Str;
+use App\Models\AuditAuditor;
+use App\Models\Organization;
+use App\Models\FinancialYear;
+use App\Models\AuditSupervisor;
+use App\Models\DynamicForm;
+use App\Models\FormResponse;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\File;
+use Intervention\Image\Facades\Image;
+
+if (!function_exists('successMessage')) {
+    function successMessage(string $type = 'success', string $message = "Information has been saved successfully!"): array
+    {
+        return [
+            'type' => $type,
+            'message' => $message
+        ];
+    }
+}
+
+if (!function_exists('infoMessage')) {
+    function infoMessage(string $type = 'info', string $message = "Information has been updated successfully!"): array
+    {
+        return [
+            'type' => $type,
+            'message' => $message
+        ];
+    }
+}
+
+if (!function_exists('deleteMessage')) {
+    function deleteMessage(string $type = 'primary', string $message = "Information has been deleted successfully!"): array
+    {
+        return [
+            'type' => $type,
+            'message' => $message
+        ];
+    }
+}
+
+
+if (!function_exists('dangerMessage')) {
+    function dangerMessage(string $type = 'danger', string $message = "Information has been deleted successfully!"): array
+    {
+        return [
+            'type' => $type,
+            'message' => $message
+        ];
+    }
+}
+
+if (!function_exists('warningMessage')) {
+    function warningMessage(string $type = 'warning', string $message = "Something is wrong!"): array
+    {
+        return [
+            'type' => $type,
+            'message' => $message
+        ];
+    }
+}
+
+if (!function_exists('starSign')) {
+    function starSign(): string
+    {
+        return " <span class='text-danger'>" . " *" . "</span>";
+    }
+}
+
+if (!function_exists('tooltip')) {
+    function tooltip($title = "", $placement = "top"): string
+    {
+        return 'data-bs-toggle="tooltip" data-bs-placement="' . $placement . '" title="' . $title . '"';
+    }
+}
+
+if (!function_exists('displayError')) {
+    function displayError(string $error = "Something went wrong!"): string
+    {
+        return "<span class='text-danger font-weight-500'>" . $error . "</span>";
+    }
+}
+
+if (!function_exists('devLogo')) {
+    function devLogo(): string
+    {
+        return "assets/dev/ex_logo.jpg";
+    }
+}
+
+if (!function_exists('hasError')) {
+    function hasError(string $fieldName): string
+    {
+        $errors = session()->get('errors');
+        return $errors && $errors->has($fieldName) ? 'border-danger is-invalid' : '';
+    }
+}
+
+if (!function_exists('commonSpinner')) {
+    function commonSpinner(): string
+    {
+        return "<i class='fa fa-spinner fa-spin me-2 spinner d-none'></i>";
+    }
+}
+
+if (!function_exists('getStatus')) {
+    function getStatus(): array
+    {
+        return [
+            (object)['value' => 'active', 'title' => 'Active'],
+            (object)['value' => 'inactive', 'title' => 'In Active']
+        ];
+    }
+}
+
+if (!function_exists('getSureStatus')) {
+    function getSureStatus(): array
+    {
+        return [
+            (object)['value' => 'yes', 'title' => 'Yes'],
+            (object)['value' => 'no', 'title' => 'No']
+        ];
+    }
+}
+
+if (!function_exists('getClosedEnded')) {
+    function getClosedEnded(): array
+    {
+        return [
+            (object)['value' => 'n/a', 'title' => 'N/A'],
+            (object)['value' => 'yes', 'title' => 'Yes'],
+            (object)['value' => 'no', 'title' => 'No']
+        ];
+    }
+}
+
+if (!function_exists('isActive')) {
+    function isActive($status): bool
+    {
+        return $status == 'active';
+    }
+}
+
+if (!function_exists('showStatus')) {
+    function showStatus($status): string
+    {
+        $status_badge = $status == 'active' ? 'primary' : 'danger';
+        $status_text = firstUpper($status);
+        return "<span class='badge badge-pill badge-soft-{$status_badge} font-size-11'>" . $status_text . "</span>";
+    }
+}
+
+if (!function_exists('dateFormat')) {
+    function dateFormat($date, $format = 'Y-m-d'): string
+    {
+        return Carbon::parse($date)->format($format);
+    }
+}
+
+if (!function_exists('imageInfo')) {
+    function imageInfo($image): array
+    {
+        return [
+            'is_image' => isImage($image),
+            'extension' => fileExtension($image),
+            'width' => imageWidthHeight($image)['width'],
+            'height' => imageWidthHeight($image)['height'],
+            'size' => $image->getSize(),
+            'mb_size' => fileSizeInMB($image->getSize())
+        ];
+    }
+}
+
+if (!function_exists('fileType')) {
+    function fileType($file): string
+    {
+        $mime = $file->getClientMimeType(); // e.g. image/png, application/pdf
+        if (str_starts_with($mime, 'image/')) {
+            return 'image';
+        } else {
+            return 'file';
+        }
+    }
+}
+
+
+if (!function_exists('isImage')) {
+    function isImage($file): bool
+    {
+        $fileType = $file->getClientMimeType();
+        $text = explode('/', $fileType)[0];
+        return $text == "image";
+    }
+}
+
+if (!function_exists('fileMimeType')) {
+    function fileMimeType($file): bool
+    {
+        return  $file->getClientMimeType();
+    }
+}
+
+if (!function_exists('fileExtension')) {
+    function fileExtension($file): mixed
+    {
+        if (isset($file)) {
+            return $file->getClientOriginalExtension();
+        } else {
+            return "Invalid file";
+        }
+    }
+}
+
+if (!function_exists('imageWidthHeight')) {
+    function imageWidthHeight($image): array
+    {
+        $imageSize = getimagesize($image);
+        $width = $imageSize[0];
+        $height = $imageSize[1];
+        return array('width' => $width, 'height' => $height);
+    }
+}
+
+if (!function_exists('fileSizeInMB')) {
+    function fileSizeInMB($size): mixed
+    {
+        if ($size > 0) {
+            return number_format($size / 1048576, 2);
+        }
+        return $size;
+    }
+}
+
+
+if (!function_exists('userAvatar')) {
+    function userAvatar(): string
+    {
+        return 'assets/common/images/avatar.png';
+    }
+}
+
+
+if (!function_exists('firstUpper')) {
+    function firstUpper($text): string
+    {
+        return ucfirst($text);
+    }
+}
+
+if (!function_exists('uploadImage')) {
+    function uploadImage($file, string $folderName = "partial/", $size = "", $width = "", $height = ""): string
+    {
+        $folderPath = "assets/files/images/" . $folderName;
+        File::isDirectory($folderPath) || File::makeDirectory($folderPath, 0777, true, true);
+        $imageName = time() . '-' . $file->getClientOriginalName();
+        $image = Image::make($file->getRealPath());
+        if ((isset($height)) && (isset($width))) {
+            $image->resize($width, $height);
+        }
+        if (isset($size)) {
+            $image->filesize($size);
+        }
+        $image->save($folderPath . "/" . $imageName);
+        return $folderPath . "/" . $imageName;
+    }
+}
+
+if (!function_exists('uploadFile')) {
+    function uploadFile($file, string $folderName = "partial/")
+    {
+        try {
+            $folderPath = "assets/files/" . trim($folderName, '/');
+            if (!file_exists($folderPath)) {
+                mkdir($folderPath, 0755, true);
+            }
+
+            $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            $extension = $file->getClientOriginalExtension();
+            $uniqueFileName = time() . '_' . Str::slug($originalName) . '.' . $extension;
+
+            if ($file->move($folderPath, $uniqueFileName)) {
+                return $folderPath . "/" . $uniqueFileName;
+            }
+        } catch (\Throwable $e) {
+            // Log the error or silently fail
+            Log::error("File upload failed: " . $e->getMessage());
+        }
+
+        return null;
+    }
+}
+
+
+if (!function_exists('segmentOne')) {
+    function segmentOne(): ?string
+    {
+        return request()->segment(1);
+    }
+}
+
+if (!function_exists('encrypt_partial')) {
+    function encrypt_partial($value, int $length = 15): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+        // Convert to string (safe for int or float)
+        $stringValue = (string)$value;
+        // Split
+        $prefix = substr($stringValue, 0, $length);
+        $suffix = substr($stringValue, $length);
+        // Encrypt the prefix
+        $encryptedPrefix = \Illuminate\Support\Facades\Crypt::encrypt($prefix);
+        // Optional: Add a separator for easier parsing during decryption
+        return $encryptedPrefix . '|PART|' . $suffix;
+    }
+}
+
+if (!function_exists('decrypt_partial')) {
+    function decrypt_partial($value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+        // Split encrypted and plain part
+        [$encryptedPrefix, $suffix] = explode('|PART|', $value, 2);
+        // Decrypt prefix
+        $decryptedPrefix = \Illuminate\Support\Facades\Crypt::decrypt($encryptedPrefix);
+        return $decryptedPrefix . $suffix;
+    }
+}
+
+if (! function_exists('encrypt_decrypt')) {
+    function encrypt_decrypt($key, $type)
+    {
+        # type = encrypt/decrypt
+        $str_rand = "XxOx*4e!hQqG5b~9a";
+
+        if (!$key) {
+            return false;
+        }
+        if ($type == 'decrypt') {
+            $en_slash_added1 = trim(str_replace(array('audit'), '/', $key));
+            $en_slash_added = trim(str_replace(array('dcaudit'), '%', $en_slash_added1));
+            $key_value = $return = openssl_decrypt($en_slash_added, "AES-128-ECB", $str_rand);
+            return $key_value;
+        } elseif ($type == 'encrypt') {
+            $key_value = openssl_encrypt($key, "AES-128-ECB", $str_rand);
+            $en_slash_remove1 = trim(str_replace(array('/'), 'audit', $key_value));
+            $en_slash_remove = trim(str_replace(array('%'), 'dcaudit', $en_slash_remove1));
+            return $en_slash_remove;
+        }
+        return FALSE;    # if function is not used properly
+    }
+}
+
+
+if (!function_exists('isMainMenuActive')) {
+    function isMainMenuActive(string $fieldName): string
+    {
+        $main_menus = explode(',', $fieldName);
+        return in_array(segmentOne(), $main_menus) ? 'active mm-active' : '';
+    }
+}
+
+if (!function_exists('isSubMenuActive')) {
+    function isSubMenuActive(string $fieldName): string
+    {
+        $sub_menus = explode(',', $fieldName);
+        return in_array(segmentOne(), $sub_menus) ? 'active' : '';
+        // return request()->segment(1) == $fieldName ? 'active' : '';
+    }
+}
+
+if (!function_exists('isActive')) {
+    function isActive(string $segment): string
+    {
+        return request()->segment(1) === $segment ? 'active' : '';
+    }
+}
+
+if (!function_exists('textLimit')) {
+    function textLimit($text = "", $limit = 20)
+    {
+        return Str::limit($text, $limit, '...');
+    }
+}
+
+if (!function_exists('numberFormat')) {
+    function numberFormat($number, $format = 2): mixed
+    {
+        return number_format($number, $format);
+    }
+}
+
+if (!function_exists('ucFirst')) {
+    function ucFirst($string = Null): string
+    {
+        return Str::ucfirst($string);
+    }
+}
+
+if (!function_exists('siteSettings')) {
+    function siteSettings()
+    {
+        $jsonString = file_get_contents('assets/common/json/site_setting.json');
+        return json_decode($jsonString, true);
+    }
+}
+
+if (!function_exists('authUser')) {
+    function authUser()
+    {
+        return Auth::check() ? Auth::user() : null;
+    }
+}
+
+// Project related
+
+if (!function_exists('authUserRole')) {
+    function authUserRole()
+    {
+        return Auth::check() ? Auth::user()->role : null;
+    }
+}
+
+if (!function_exists('getPriorityStatus')) {
+    function getPriorityStatus(): array
+    {
+        return [
+            (object)['value' => 'low', 'title' => 'Low'],
+            (object)['value' => 'medium', 'title' => 'Medium'],
+            (object)['value' => 'high', 'title' => 'High'],
+            (object)['value' => 'critical', 'title' => 'Critical']
+        ];
+    }
+}
+
+if (!function_exists('getWorkFlowStatus')) {
+    function getWorkFlowStatus(): array
+    {
+        return [
+            (object)['value' => 'draft',    'title' => 'Draft'],
+            // (object)['value' => 'ongoing',  'title' => 'Ongoing'],
+            // (object)['value' => 'reviewed', 'title' => 'Reviewed'],
+            // (object)['value' => 'approved', 'title' => 'Approved'],
+            (object)['value' => 'rejected', 'title' => 'Rejected'],
+            (object)['value' => 'complete', 'title' => 'Complete'],
+            (object)['value' => 'reopened', 'title' => 'Reopened']
+        ];
+    }
+}
+
+if (!function_exists('getAuditStepStatus')) {
+    function getAuditStepStatus(): array
+    {
+        return [
+            (object)['value' => 'draft',    'title' => 'Draft'],
+            (object)['value' => 'ongoing',  'title' => 'Ongoing'],
+            (object)['value' => 'returned',  'title' => 'Returned'],
+            // (object)['value' => 'reviewed', 'title' => 'Reviewed'],
+            (object)['value' => 'approved', 'title' => 'Approved'],
+            (object)['value' => 'rejected', 'title' => 'Rejected']
+        ];
+    }
+}
+
+if (!function_exists('stepSlugById')) {
+
+    function stepSlugById($step_id = null) // Changed Null to null (lowercase)
+    {
+        return \App\Models\AuditStep::where('id', $step_id)->pluck('slug')->first();
+    }
+}
+
+if (!function_exists('activeOrganizations')) {
+    function activeOrganizations()
+    {
+        return Organization::active()->oldest('name')->select('id', 'name', 'slug')->get();
+    }
+}
+
+if (!function_exists('financialYears')) {
+    function financialYears()
+    {
+        return FinancialYear::latest('financial_year')->select('id', 'financial_year')->get();
+    }
+}
+
+if (!function_exists('getActiveAdmins')) {
+    function getActiveAdmins()
+    {
+        return User::active()->admin()->select('id', 'name')->get();
+    }
+}
+
+if (!function_exists('auditAuditorsToArray')) {
+    function auditAuditorsToArray($audit_id = null)
+    {
+        return AuditAuditor::where('audit_id', $audit_id)->pluck('user_id')->toArray() ?? [];
+    }
+}
+
+if (!function_exists('auditSupervisorsToArray')) {
+    function auditSupervisorsToArray($audit_id = null)
+    {
+        return AuditSupervisor::where('audit_id', $audit_id)->pluck('user_id')->toArray() ?? [];
+    }
+}
+
+if (!function_exists('isStepActive')) {
+    /**
+     * Determine if a step should be active based on step number and previous step's status
+     *
+     * @param \Illuminate\Support\Collection $steps
+     * @param int $index
+     * @return bool
+     */
+    function isStepActive($steps, $index)
+    {
+        if ($index === 0) {
+            return true; // First step is always active
+        }
+
+        $previousStep = $steps[$index - 1] ?? null;
+
+        //return $previousStep && $previousStep->status === 'reviewed';
+        return $previousStep && $previousStep->status === 'approved';
+    }
+}
+
+if (! function_exists('auditWiseAuditors')) {
+    function auditWiseAuditors($audit_id = null)
+    {
+        $auditors = AuditAuditor::where('audit_id', $audit_id)->pluck('user_id');
+        $users = User::whereIn('id', $auditors)->pluck('name')->toArray();
+        return implode(', ', $users);
+    }
+}
+
+if (! function_exists('auditWiseSupervisors')) {
+    function auditWiseSupervisors($audit_id = null)
+    {
+        $auditors = AuditSupervisor::where('audit_id', $audit_id)->pluck('user_id');
+        $users = User::whereIn('id', $auditors)->pluck('name')->toArray();
+        return implode(', ', $users);
+    }
+}
+
+if (! function_exists('auditStepStatusWiseCount')) {
+    function auditStepStatusWiseCount($status = null)
+    {
+        return Audit::whereHas('audit_steps', function ($q) use ($status) {
+            $q->where('status', $status);
+        })
+            ->count();
+    }
+}
+
+if (! function_exists('supervisorStepStatusWiseCount')) {
+    function supervisorStepStatusWiseCount($status = null, $supervisor_id = null)
+    {
+        $supervisorId = $supervisor_id ?? Auth::id();
+        return Audit::whereHas('supervisors', function ($q) use ($supervisorId) {
+            $q->where('user_id', $supervisorId);
+        })
+            ->whereHas('audit_steps', function ($q) use ($status) {
+                $q->where('status', $status);
+            })
+            ->count();
+    }
+}
+
+if (! function_exists('auditorStepStatusWiseCount')) {
+    function auditorStepStatusWiseCount($auditor_id = null, $status = null)
+    {
+        $auditorId = $auditor_id ?? Auth::id();
+        return Audit::whereHas('auditors', function ($q) use ($auditorId) {
+            $q->where('user_id', $auditorId);
+        })
+            ->whereHas('audit_steps', function ($q) use ($status) {
+                $q->where('status', $status);
+            })
+            ->count();
+    }
+}
+
+if(! function_exists('questionHasForm')) {
+    function questionHasForm($step_id = null, $question_id = null) {
+        if(DynamicForm::where('audit_step_id', $step_id)->where('question_id', $question_id)->exists()) {
+            return true;
+        }
+    }
+}   
+
+if(! function_exists('getFormId')) {
+    function getFormId ($step_id = null, $question_id = null) {
+        return DynamicForm::where('audit_step_id', $step_id)->where('question_id', $question_id)->pluck('id')->first();
+    }
+}   
+
+if(! function_exists('auditFormAnswer')) {
+    function auditFormAnswer ($audit_id = null, $step_id = null, $question_id = null) {
+        if($audit_id && $step_id && $question_id) {
+            return FormResponse::where('audit_id', $audit_id)
+                ->where('audit_step_id', $step_id)
+                ->where('question_id', $question_id)
+                ->first();
+        }
+    }
+}   
+
+if(! function_exists('responseId')) {
+    function responseId ($audit_id = null, $step_id = null, $question_id = null) {
+        if($audit_id && $step_id && $question_id) {
+            return FormResponse::where('audit_id', $audit_id)
+                ->where('audit_step_id', $step_id)
+                ->where('question_id', $question_id)
+                ->first()->id;
+        }
+    }
+}   
+
+
+if (!function_exists('formBuilderRender')) {
+    /**
+     * Render a single field from formBuilder JSON.
+     *
+     * @param  object|array  $field      Field object (stdClass or array) from form JSON
+     * @param  mixed         $value      Prefill value (string/array). Pass $responses[$fieldKey] when available.
+     * @return string
+     */
+    function formBuilderRender($field, $value = null)
+    {
+        // normalize object/array access
+        $get = function ($k, $default = null) use ($field) {
+            if (is_array($field)) {
+                return $field[$k] ?? $default;
+            }
+            return $field->$k ?? $default;
+        };
+
+        $html = '';
+
+        // Name generation (must match what you used when saving responses)
+        $fieldName = $get('name') ?? 'field_' . ($get('id') ?? uniqid());
+        $type = $get('type', 'text');
+        $placeholder = $get('placeholder', '');
+        $required = !empty($get('required')) ? 'required' : '';
+        $label = $get('label', '');
+
+        // If no $value passed, attempt old() Laravel input (useful after validation error)
+        if ($value === null) {
+            $value = old($fieldName);
+        }
+
+        // Add label for non-signature / non-paragraph fields
+        if (!empty($label) && !in_array($type, ['signature', 'paragraph'])) {
+            $html .= '<label class="form-label">' . e($label);
+            if (!empty($get('required'))) {
+                $html .= ' <span class="text-danger">*</span>';
+            }
+            $html .= '</label>';
+        }
+
+        // helper to read option value/label robustly (array or object)
+        $readOpt = function ($opt) {
+            if (is_array($opt)) {
+                $v = $opt['value'] ?? ($opt['label'] ?? null);
+                $l = $opt['label'] ?? ($opt['value'] ?? $v);
+            } else {
+                $v = $opt->value ?? ($opt->label ?? null);
+                $l = $opt->label ?? ($opt->value ?? $v);
+            }
+            return [(string)$v, (string)$l];
+        };
+
+        switch ($type) {
+            case 'text':
+            case 'number':
+            case 'email':
+            case 'url':
+            case 'phone':
+                $html .= '<input type="' . $type . '" name="' . e($fieldName) . '" class="form-control" placeholder="' . e($placeholder) . '" value="' . e($value ?? '') . '" ' . $required . '>';
+                break;
+
+            case 'date':
+                $html .= '<input type="text" name="' . e($fieldName) . '" class="form-control datepicker" placeholder="' . e($placeholder) . '" value="' . e($value ?? '') . '" ' . $required . '>';
+                break;
+
+            case 'textarea':
+                $html .= '<textarea name="' . e($fieldName) . '" class="form-control" placeholder="' . e($placeholder) . '" ' . $required . '>' . e($value ?? '') . '</textarea>';
+                break;
+
+            case 'paragraph':
+                // readonly textarea with value (unique name to save)
+                $fieldKey = $get('name') ?? 'paragraph_' . ($get('id') ?? uniqid());
+                $fieldValue = isset($label) ? html_entity_decode(strip_tags($label)) : '';
+                $html .= '<textarea name="' . e($fieldKey) . '" class="form-control bg-readonly" placeholder="' . e($placeholder) . '" readonly>' . e($fieldValue) . '</textarea>';
+                break;
+
+            case 'select':
+                // support multiple
+                $isMultiple = !empty($get('multiple')) || (strpos((string)$get('className', ''), 'multiple') !== false);
+                $selName = $isMultiple ? $fieldName . '[]' : $fieldName;
+                $multipleAttr = $isMultiple ? ' multiple' : '';
+                $html .= '<select name="' . e($selName) . '" class="form-select" ' . $multipleAttr . ' ' . $required . '>';
+                foreach ($get('values', []) as $opt) {
+                    list($optVal, $optLabel) = $readOpt($opt);
+                    $selected = '';
+                    if ($isMultiple && is_array($value) && in_array($optVal, $value)) {
+                        $selected = ' selected';
+                    } elseif (!$isMultiple && ((string)$value === $optVal)) {
+                        $selected = ' selected';
+                    }
+                    $html .= '<option value="' . e($optVal) . '"' . $selected . '>' . e($optLabel) . '</option>';
+                }
+                $html .= '</select>';
+                break;
+
+            case 'checkbox':
+                // checkbox can be multiple values
+                foreach ($get('values', []) as $i => $opt) {
+                    list($optVal, $optLabel) = $readOpt($opt);
+                    $inputId = e($fieldName . '_' . $i);
+                    $checked = '';
+                    if (is_array($value) && in_array($optVal, $value)) {
+                        $checked = 'checked';
+                    } elseif ((string)$value === $optVal) {
+                        // single value saved as string
+                        $checked = 'checked';
+                    }
+                    $html .= '<div class="form-check">';
+                    $html .= '<input class="form-check-input" type="checkbox" name="' . e($fieldName) . '[]" value="' . e($optVal) . '" id="' . $inputId . '" ' . $checked . ' ' . $required . '>';
+                    $html .= '<label class="form-check-label" for="' . $inputId . '">' . e($optLabel) . '</label>';
+                    $html .= '</div>';
+                }
+                break;
+
+            case 'radio':
+                foreach ($get('values', []) as $i => $opt) {
+                    list($optVal, $optLabel) = $readOpt($opt);
+                    $inputId = e($fieldName . '_' . $i);
+                    $checked = ((string)$value === $optVal) ? 'checked' : '';
+                    $html .= '<div class="form-check">';
+                    $html .= '<input class="form-check-input" type="radio" name="' . e($fieldName) . '" value="' . e($optVal) . '" id="' . $inputId . '" ' . $checked . ' ' . $required . '>';
+                    $html .= '<label class="form-check-label" for="' . $inputId . '">' . e($optLabel) . '</label>';
+                    $html .= '</div>';
+                }
+                break;
+
+            case 'file':
+                $multipleAttr = !empty($get('multiple')) ? ' multiple' : '';
+                $nameAttr = !empty($get('multiple')) ? e($fieldName) . '[]' : e($fieldName);
+                $html .= '<input type="file" name="' . $nameAttr . '" class="form-control" ' . $multipleAttr . ' ' . $required . '>';
+                break;
+
+            case 'signature':
+                $id = e($get('id') ?? $fieldName);
+                $html .= '<div class="signature-wrapper">';
+                if (!empty($label)) {
+                    $html .= '<label class="form-label">' . e($label);
+                    if (!empty($get('required'))) $html .= ' <span class="text-danger">*</span>';
+                    $html .= '</label>';
+                }
+                $html .= '<canvas id="sigpad_' . $id . '" class="signature-pad" style="border:1px solid #ddd; width:100%; height:150px;"></canvas>';
+                $html .= '<input type="hidden" name="field_' . $id . '_signature" id="siginput_' . $id . '" ' . $required . '>';
+                $html .= '<button type="button" class="btn btn-sm btn-secondary mt-2 clear-signature" data-target="sigpad_' . $id . '">Clear</button>';
+                $html .= '</div>';
+                break;
+
+            case 'autocomplete':
+                // simple datalist fallback — no external JS required
+                $listId = 'list_' . e($fieldName);
+                $html .= '<input type="text" name="' . e($fieldName) . '" list="' . $listId . '" class="form-control" placeholder="' . e($placeholder) . '" value="' . e($value ?? '') . '" ' . $required . '>';
+                $html .= '<datalist id="' . $listId . '">';
+                foreach ($get('values', []) as $opt) {
+                    list($optVal, $optLabel) = $readOpt($opt);
+                    $html .= '<option value="' . e($optVal) . '">' . e($optLabel) . '</option>';
+                }
+                $html .= '</datalist>';
+                break;
+
+            default:
+                $html .= '<input type="text" name="' . e($fieldName) . '" class="form-control" placeholder="' . e($placeholder) . '" value="' . e($value ?? '') . '" ' . $required . '>';
+                break;
+        }
+
+        return $html;
+    }
+}
+
+
+
